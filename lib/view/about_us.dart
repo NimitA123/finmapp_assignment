@@ -1,8 +1,8 @@
 import 'dart:convert';
-import 'package:finmapp_quiz/view/result_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../model/Questions.dart';
+import 'result_screen.dart';
 
 class AboutUs extends StatefulWidget {
   const AboutUs({Key? key}) : super(key: key);
@@ -12,8 +12,8 @@ class AboutUs extends StatefulWidget {
 }
 
 class _AboutUs extends State<AboutUs> {
-  late List<Fields> fields;
-  late List<int?> selectedAnswers;
+  late List<Fields> fieldsWithOptions;
+  late List<String?> selectedAnswers;
   late int selectedRadio;
 
   Future<void> readJson() async {
@@ -22,8 +22,13 @@ class _AboutUs extends State<AboutUs> {
 
     setState(() {
       var dataOfJson = questionsFromJson(response);
-      fields = dataOfJson.schema!.fields!;
-      selectedAnswers = List.filled(fields.length, null);
+      // Filter out questions without options
+      fieldsWithOptions = dataOfJson.schema!.fields!
+          .where((field) =>
+      field.schema?.options != null &&
+          field.schema!.options!.isNotEmpty)
+          .toList();
+      selectedAnswers = List.filled(fieldsWithOptions.length, null);
     });
   }
 
@@ -40,31 +45,36 @@ class _AboutUs extends State<AboutUs> {
   Widget build(BuildContext context) {
     var screenWidth = MediaQuery.of(context).size.width;
 
-
     void updateValue() {
       setState(() {
-        if (defaultPosition < (fields.length - 1)) {
+        if (defaultPosition < (fieldsWithOptions.length - 1)) {
           defaultPosition += 1;
 
-          while (fields[defaultPosition].schema?.options?.isEmpty == true) {
+          while (fieldsWithOptions[defaultPosition].schema?.options?.isEmpty ==
+              true) {
             defaultPosition += 1;
-            if (defaultPosition >= fields.length) {
-
+            if (defaultPosition >= fieldsWithOptions.length) {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => ResultScreen(selectedAnswers: selectedAnswers),
+                  builder: (context) => ResultScreen(
+                    selectedAnswers: selectedAnswers,
+                    fields: fieldsWithOptions,
+                  ),
                 ),
               );
               return;
             }
           }
         } else {
-          // If at the last question, navigate to the result screen
+
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => ResultScreen(selectedAnswers: selectedAnswers),
+              builder: (context) => ResultScreen(
+                selectedAnswers: selectedAnswers,
+                fields: fieldsWithOptions,
+              ),
             ),
           );
         }
@@ -76,10 +86,10 @@ class _AboutUs extends State<AboutUs> {
         if (defaultPosition > 0) {
           defaultPosition -= 1;
 
-          while (fields[defaultPosition].schema?.options?.isEmpty == true) {
+          while (fieldsWithOptions[defaultPosition].schema?.options?.isEmpty ==
+              true) {
             defaultPosition -= 1;
             if (defaultPosition < 0) {
-
               defaultPosition = 0;
               break;
             }
@@ -90,15 +100,17 @@ class _AboutUs extends State<AboutUs> {
       });
     }
 
-    void setSelectedRadio(int val) {
+    void setSelectedRadio(String answer) {
       setState(() {
-        selectedRadio = val;
-        selectedAnswers[defaultPosition] = val; // Store the selected answer
+        selectedRadio = fieldsWithOptions[defaultPosition]
+            .schema!
+            .options!
+            .indexWhere((option) => option.value == answer);
+        selectedAnswers[defaultPosition] = answer; // Store the selected answer
       });
     }
 
-    if (fields.isEmpty) {
-
+    if (fieldsWithOptions.isEmpty) {
       return Scaffold(
         body: Center(
           child: Text("No questions available."),
@@ -121,14 +133,14 @@ class _AboutUs extends State<AboutUs> {
               width: screenWidth,
               height: 5,
               child: ListView.builder(
-                itemCount: fields.length,
+                itemCount: fieldsWithOptions.length,
                 scrollDirection: Axis.horizontal,
                 shrinkWrap: true,
                 itemBuilder: (BuildContext context, int index) {
                   return Container(
                     width: (screenWidth -
-                        (32 + ((fields.length + 5) * 2))) /
-                        fields.length,
+                        (32 + ((fieldsWithOptions.length + 5) * 2))) /
+                        fieldsWithOptions.length,
                     margin: EdgeInsets.symmetric(horizontal: 2),
                     decoration: BoxDecoration(
                       color: (defaultPosition < index)
@@ -142,17 +154,23 @@ class _AboutUs extends State<AboutUs> {
             ),
             Container(
               margin: EdgeInsets.only(top: 15),
-              child: Text(fields[defaultPosition].schema?.label ?? ""),
+              child:
+              Text(fieldsWithOptions[defaultPosition].schema?.label ?? ""),
             ),
             Expanded(
               child: ListView.builder(
-                itemCount: fields[defaultPosition].schema?.options?.length ?? 0,
+                itemCount:
+                fieldsWithOptions[defaultPosition].schema?.options?.length ??
+                    0,
                 scrollDirection: Axis.vertical,
                 shrinkWrap: true,
                 itemBuilder: (BuildContext context, int index) {
                   return GestureDetector(
                     onTap: () {
-                      setSelectedRadio(index);
+                      setSelectedRadio(fieldsWithOptions[defaultPosition]
+                          .schema!
+                          .options![index]
+                          .value!);
                     },
                     child: Container(
                       margin: EdgeInsets.only(bottom: 10, top: 5),
@@ -171,12 +189,15 @@ class _AboutUs extends State<AboutUs> {
                             value: index,
                             groupValue: selectedRadio,
                             onChanged: (onChanged) {
-                              setSelectedRadio(onChanged ?? 0);
+                              setSelectedRadio(fieldsWithOptions[defaultPosition]
+                                  .schema!
+                                  .options![index]
+                                  .value!);
                             },
                             activeColor: Colors.deepOrangeAccent,
                           ),
                           Text(
-                              "${fields[defaultPosition].schema!.options?[index].value}")
+                              "${fieldsWithOptions[defaultPosition].schema!.options?[index].value}")
                         ],
                       ),
                     ),
@@ -228,4 +249,3 @@ class _AboutUs extends State<AboutUs> {
     );
   }
 }
-
